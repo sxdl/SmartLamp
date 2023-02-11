@@ -39,8 +39,8 @@ def detect(image_path):
     return coordinates
 
 
-def pose_classification():
-    x_input = detect('a93.png')
+def pose_classification(image_path):
+    x_input = detect(image_path)
 
     '''
     导入姿势分类模型

@@ -18,18 +18,25 @@ movenet标记关键点
 movenet = Movenet('movenet_thunder')
 
 
-def detect(image_path):
-    image = tf.io.read_file(image_path)
-    image = tf.io.decode_jpeg(image)
-    image_height, image_width, channel = image.shape
+def detect(img: np.ndarray):
+    # image = tf.io.read_file(image_path)
+    # img = tf.convert_to_tensor(img, dtype=np.str)
+    # img = img.astype(np.int64)
+    # image = tf.io.decode_jpeg(img)
+    # image_height, image_width, channel = image.shape
 
-    person = movenet.detect(image.numpy(), reset_crop_region=False)
+    person = movenet.detect(img, reset_crop_region=False)
 
     # Get landmarks and scale it to the same size as the input image
     pose_landmarks = np.array(
         [[keypoint.coordinate.x, keypoint.coordinate.y, keypoint.score]
          for keypoint in person.keypoints],
         dtype=np.float32)
+
+    # If every point score are less than 0.5, there is no person
+    max_score = np.max(pose_landmarks[:, 2], axis=0)
+    if max_score < 0.5:
+        return 0
 
     # Write the landmark coordinates to its per-class CSV file
     coordinates = pose_landmarks.flatten().astype('float64')
@@ -39,8 +46,17 @@ def detect(image_path):
     return coordinates
 
 
-def pose_classification(image_path):
-    x_input = detect(image_path)
+def pose_classification(image) -> int:
+    """Input an image and return pose classification. The image must be 3 channel.
+    Returns
+        book: 0.
+        desktop: 1,
+        mobile: 2,
+        no person: -1
+    """
+    x_input = detect(image)
+    if type(x_input) == int:
+        return -1
 
     '''
     导入姿势分类模型
@@ -49,9 +65,8 @@ def pose_classification(image_path):
 
     y_predict = model.predict(x_input)
     y_predict = np.argmax(y_predict, axis=1)[0]
-    '''
-    book: 0
-    desktop: 1
-    mobile: 2
-    '''
-    return y_predict
+
+    return int(y_predict)
+
+
+# pose_classification('a88.png')

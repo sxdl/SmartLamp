@@ -4,7 +4,10 @@ import socket
 import json
 import threading
 import my_face_feature
+from SmartLampServer import my_pose_classify
 from typing import Any
+import my_img_process
+import struct
 
 
 def function_call(msg) -> (int, Any):
@@ -16,8 +19,10 @@ def function_call(msg) -> (int, Any):
         return_value = 'KeyError: ' + str(err) + '. Be sure to include [\'function\', \'argument\']'
         return -1, return_value
     if function == 'image_process':
+        argument = my_img_process.base64_to_cv2(argument)
         is_eye_closed = my_face_feature.is_eye_closed(argument)
-        return 0, is_eye_closed
+        pose = my_pose_classify.pose_classification(argument)
+        return 0, {'is_eye_close': is_eye_closed, 'pose_classify': pose}
     elif function == 'image_test':
         # img = my_img_process.base64_to_cv2(argument)
         # cv2.imshow('test_img', img)

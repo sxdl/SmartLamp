@@ -1,10 +1,10 @@
 import mysocket
-import myfunction
 import socket
 import queue
 import threading
-import os
+import sys
 from mylogging import logging_fun
+import myfunction
 
 # 配置日志
 logging_fun('server.log')

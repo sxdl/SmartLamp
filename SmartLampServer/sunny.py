@@ -189,7 +189,8 @@ def connectremote(host, port):
         ssl_client.setblocking(1)
         logger = logging.getLogger('%s:%d' % ('Conn', ssl_client.fileno()))
         logger.debug('New connection to: %s:%d' % (host, port))
-    except socket.error:
+    except socket.error as e:
+        print(e)
         return False
 
     return ssl_client

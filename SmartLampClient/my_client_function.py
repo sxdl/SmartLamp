@@ -12,15 +12,18 @@ import threading
 import json
 import serial
 import os
+import struct
 import bluetooth
+import serial
+import time
 
 
 def connect_internet() -> bool:
     ipaddress = socket.gethostbyname(socket.gethostname())
     if ipaddress == "127.0.0.1":
+        print('Err: not connected to Internet!')
         return False
     else:
-        print('Err: not connected to Internet!')
         return True
 
 
@@ -30,8 +33,8 @@ def send_and_reply(datapack: bytes, conn_socket: socket.socket, mq: queue.Queue)
     mq.put(message)
 
 
-def fatigue_detection_send_thread(conn_socket: socket.socket, cap, mq: queue.Queue):
-    print("fatigue_detection_send_thread()")
+def image_send_thread(conn_socket: socket.socket, cap, mq: queue.Queue):
+    print("image_send_thread()")
     while True:
         img = cap.read()[1]  # 获取摄像头图片
         img = img_process(img)
@@ -46,22 +49,53 @@ def fatigue_detection_send_thread(conn_socket: socket.socket, cap, mq: queue.Que
         time.sleep(1.5)  # 20帧
 
 
-def fatigue_detection_judge_thread(conn_socket: socket.socket, mq: queue.Queue, strip):
+def message_address_thread(rq: queue.Queue, fq: queue.Queue, pq: queue.Queue):
+    """
+    :param rq: reply_queue 服务器返回数据消息队列
+    :param fq: fatigue_queue 疲劳检测模块消息队列
+    :param pq: pose_queue 姿势分类模块消息队列
+    :return: None
+    """
+    while True:
+        '''
+            message = {
+                'status_code': [int],
+                'reply': dict['is_eye_close': [int],
+                              'pose_classify': [int],]
+            }
+            '''
+        message = json.loads(rq.get())
+        status_code = message['status_code']
+        reply = message['reply']
+        is_eye_close = reply['is_eye_close']
+        pose_classify = reply['pose_classify']
+        fatigue_message = {
+            'reply': is_eye_close
+        }
+        fq.put(json.dumps(fatigue_message))
+        pose_message = {
+            'reply': pose_classify
+        }
+        pq.put(json.dumps(pose_message))
+        # print(message)
+
+
+def fatigue_detection_judge_thread(conn_socket: socket.socket, mq: queue.Queue, strip):  # strip
     print('fatigue_detection_judge_thread()')
     is_eye_closed_list = [0] * FATIGUE_DETECT_FREQUENCY
     perclos_sum = 0
     while True:
         '''
         message = {
-            'status_code': status_code,
+            # 'status_code': status_code,
             'reply': Union[0,1,-1]
         }
         '''
         message = json.loads(mq.get())
         # print(message)
-        status_code = message['status_code']
+        # status_code = message['status_code']
         reply = message['reply']
-        if status_code or reply < 0:  # 若非零，则返回值异常
+        if reply < 0:  # 若非零，则返回值异常
             continue
         # 计算PERCLOS值,0.15为阈值
         perclos_sum += reply
@@ -78,14 +112,8 @@ def fatigue_detection_judge_thread(conn_socket: socket.socket, mq: queue.Queue, 
             set_led_mode(strip, 1)
 
 
-def fatigue_detection_thread(cap, mq: queue.Queue, strip):
-    conn_socket = mysocket.connect_tcp(SERVER_ADDR)  # 连接远程服务器
-    # 图像发送线程
-    send_thread = threading.Thread(target=fatigue_detection_send_thread, args=(conn_socket, cap, mq))
-    send_thread.start()
-    # PERCLOS 计算线程
-    judge_thread = threading.Thread(target=fatigue_detection_judge_thread, args=(conn_socket, mq, strip))
-    judge_thread.start()
+# def fatigue_detection_thread(conn_socket, cap, mq: queue.Queue, strip):
+#
 
 
 def ble_pair():
@@ -106,7 +134,7 @@ def ble_pair():
 
     port = server_sock.getsockname()[1]
 
-    uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+    uuid = "00001101-0000-1000-8000-00805F9B34FB"
 
     bluetooth.advertise_service(server_sock, "SampleServer", service_id=uuid,
                                 service_classes=[uuid, bluetooth.SERIAL_PORT_CLASS],
@@ -118,15 +146,19 @@ def ble_pair():
 
     client_sock, client_info = server_sock.accept()
     print("Accepted connection from", client_info)
+    client_sock.recv(10)
+    return client_sock
 
 
-def command_process(strip):
+def command_process(strip, blt_sock):
+    print("command_process")
     while True:
-        try:
-            ser = serial.Serial("/dev/rfcomm0", 9600)  # 开启串口，波特率为9600
-        except:
-            time.sleep(5)
-            continue
+        # try:
+        #     ser = serial.Serial("/dev/rfcomm0", 9600)  # 开启串口，波特率为9600
+        # except:
+        #     time.sleep(5)
+        #     continue
+
         '''
         head = packSize
         command = {
@@ -134,11 +166,12 @@ def command_process(strip):
             args : Arguments
         }
         '''
-        size = ser.read(4).decode('utf-8')  # 包大小
-        command = json.loads(ser.read(size))
+        size = int(blt_sock.recv(2).decode('utf-16'))  # 包大小
+        command = json.loads(blt_sock.recv(size))
         function_name = command['func']
         args = command['args']
 
         if function_name == "set_led_mode":
-            set_led_mode(strip, args)
+            arg = int(args)
+            set_led_mode(strip, arg)
         # ser.close()  # 关闭串口

@@ -3,21 +3,6 @@ import sys
 import struct
 import time
 
-s = socket.socket()
-s.bind('127.0.0.1', 45000)
-s.listen()
-s.accept()  # s.connect()
-s.recv()  # 客户端的信息
-s.send()
-
-
-# client
-c = socket.socket()
-s.connect()
-s.send() # 发送
-s.recv()
-
-
 buff_size = 1024
 
 

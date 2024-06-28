@@ -40,27 +40,60 @@ def receive_tcp(conn_socket: socket.socket) -> str:
 
 
 def send_udp(address, datapack, udp_socket: socket.socket):
-    buffer = 1024
     data_len = len(datapack)
+    pack_num = 60
+    if data_len % 60 != 0:
+        buffer = data_len // pack_num + 1
+    else:
+        buffer = data_len // pack_num
     while True:
         send_data = datapack
         pack_number = 0
         while data_len >= buffer:
-            udp_socket.sendto(struct.pack('i1024s', pack_number, send_data[:buffer]), address)
+            udp_socket.sendto(struct.pack(f'i{buffer}s', pack_number, send_data[:buffer]), address)
             send_data = send_data[buffer:]
             data_len -= buffer
             pack_number += 1
         if 0 < data_len < buffer:
             udp_socket.sendto(struct.pack('i{0}s'.format(data_len), pack_number, send_data), address)
+            break
+        # udp_socket.sendto(b"end", address)
         reply = udp_socket.recvfrom(4)
         if reply[1] == address and reply[0] == "ok":
             break
 
 
-# def receive_udp(udp_socket: socket.socket):
-#     while True:
-#         # data_len, client_address = udp_socket.recv from(4)
-#         pass
+def receive_udp(udp_socket: socket.socket):
+    buffer = 1024
+    received_data = {}  # 用于缓存接收到的数据包
+    expected_pack_number = 0  # 下一个期望接收的包号
+    address = None
+
+    while True:
+        try:
+            data, addr = udp_socket.recvfrom(1500)  # 接收数据包和包号
+            pack_number, pack_data = struct.unpack(f'i{len(data)-4}s', data)
+
+            if address is None:
+                address = addr  # 记录发送端地址，以便回复
+
+            # 如果接收到的包号和期望接收的包号匹配，则缓存数据
+            if pack_number == expected_pack_number:
+                received_data[pack_number] = pack_data
+                expected_pack_number += 1
+                if pack_number == 59:
+                    # 回复发送端
+                    # udp_socket.sendto(b"ok", address)
+                    break
+
+        except socket.timeout:
+            # 超时表示数据接收完成或发生了丢包
+            break
+
+    # 组装接收到的数据包
+    received_bytes = b"".join(received_data[i] for i in range(expected_pack_number))
+
+    return received_bytes
 
 
 def create_tcp(host, port) -> socket.socket:

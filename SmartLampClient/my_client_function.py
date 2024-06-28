@@ -1,20 +1,15 @@
 import logging
 import queue
 import socket
-import time
-import cv2
-from my_face_feature import img_process
+from SmartLampServer.my_face_feature import img_process
 from my_img_process import *
 from my_light_control import set_led_mode
 from configuration import *
 import mysocket
 import threading
 import json
-import serial
 import os
-import struct
 import bluetooth
-import serial
 import time
 
 

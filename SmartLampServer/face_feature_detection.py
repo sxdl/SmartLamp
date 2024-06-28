@@ -28,8 +28,8 @@ def resize(image, width=1200):  # 将待检测的image进行resize
     return resized
 
 
-def feature():
-    image_file = "test.png"
+def feature(image_file):
+    # image_file = "test.png"
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
     image = cv2.imread(image_file)
@@ -51,9 +51,9 @@ def feature():
             # cv2.putText(image, str(i), (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.6, (100, 200, 200), 2)
     cv2.imshow("Output", image)
     cv2.waitKey(0)
-    # cv2.imwrite('test_output.png', image)
+    cv2.imwrite('test_output.png', image)
 
 
 if __name__ == "__main__":
 
-    feature()
+    feature("../gray_test.png")

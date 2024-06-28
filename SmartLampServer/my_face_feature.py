@@ -6,6 +6,15 @@ import my_img_process
 import cv2
 import time
 from configuration import MAX_EYE
+from global_const import FATIGUE_FLAG, POSE_FLAG
+import global_const
+import json
+import queue
+import random
+
+
+# FATIGUE_FLAG = False
+# POSE_FLAG = False
 
 
 # 将包含68个特征的的shape转换为numpy array格式
@@ -41,12 +50,53 @@ def distance(x, y):
     return np.sqrt(np.sum((x - y) ** 2))
 
 
-def is_eye_closed(img) -> int:
+def reply_package(status_code, return_value, sq: queue.Queue):
+    '''
+            message
+            {
+                'function': 调用函数名
+                'argument': 函数参数
+            }
+            '''
+    reply = {
+        'status_code': status_code,
+        'reply': return_value
+    }
+    # print(" decode_package(): fileno = {0}".format(conn_socket.fileno()))
+    # print(conn_socket)
+    sq.put(json.dumps(reply))
+
+
+def is_eye_closed(img, sq, wd):
+    # print('is_eye_closed thread')
+    # global FATIGUE_FLAG
+    # if global_const.FATIGUE_FLAG:
+    #     print('is_eye_closed thread')
+    #     return -2
+    # global_const.FATIGUE_FLAG = True
+
+    generate_value = 0
+    rand_num = random.random()  # 生成一个[0, 1)范围内的随机数
+    # print(f'random_num: {rand_num}')
+    if rand_num < 0.4:
+        generate_value = 0
+    elif rand_num < 0.7:
+        generate_value = 0.01
+    else:
+        generate_value = -0.01
+
+    wd.update_information(is_eye_closed_result=generate_value)
+
+
+    """
     feature = face_feature(img)
     if not feature.sum():
         # img = my_img_process.base64_to_cv2(img)
         # cv2.putText(img, 'No Face', (10, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (100, 200, 200), 1)
         # cv2.imwrite('./log/{0}.png'.format(time.time_ns()), img)
+        global_const.FATIGUE_FLAG = False
+        reply_package(0, {'is_eye_close': -1, 'pose_classify': -1}, sq, server_socket)
+        print("'is_eye_close': -1, 'pose_classify': -1")
         return -1
 
     left_eye_height = (distance(feature[37], feature[41]) + distance(feature[38], feature[40]))/2
@@ -70,13 +120,21 @@ def is_eye_closed(img) -> int:
         cv2.putText(img, 'Eye: Close', (10, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (100, 200, 200), 1)
         cv2.imwrite('./log/{0}.png'.format(time.time_ns()), img)
         '''
+        global_const.FATIGUE_FLAG = False
+        reply_package(0, {'is_eye_close': 1, 'pose_classify': -1}, sq, server_socket)
+        print("'is_eye_close': 1, 'pose_classify': -1")
         return 1
     else:
         '''debug only
         cv2.putText(img, 'Eye: Open', (10, 20), cv2.FONT_HERSHEY_COMPLEX, 1, (100, 200, 200), 1)
         cv2.imwrite('./log/{0}.png'.format(time.time_ns()), img)
         '''
+        global_const.FATIGUE_FLAG = False
+        reply_package(0, {'is_eye_close': 0, 'pose_classify': -1}, sq, server_socket)
+        print("'is_eye_close': 0, 'pose_classify': -1")
         return 0
+    
+    """
 
 
 def perclos() -> float:
